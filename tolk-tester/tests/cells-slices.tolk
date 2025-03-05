@@ -162,8 +162,8 @@ fun test13() {
 }
 
 @method_id(114)
-fun test110(x: int) {
-    var s = beginCell().storeBool(x < 0).storeBool(0).storeBool(x).endCell().beginParse();
+fun test110(x: bool) {
+    var s = beginCell().storeBool(x == true).storeBool(false).storeBool(x).endCell().beginParse();
     return (s.loadBool(), s.loadBool(), s.loadBool());
 }
 
@@ -179,15 +179,15 @@ fun test111() {
     if (s.addressIsNone()) {
         s.skipBits(2);
     }
-    if (s.loadBool() == 0) {
-        assert(s.loadBool() == 0) throw 444;
+    if (s.loadBool() == false) {
+        assert(!s.loadBool()) throw 444;
         s.skipBouncedPrefix();
     }
     var op2 = s.loadMessageOp();
     var q2 = s.loadMessageQueryId();
     s.skipBits(64);
     s.assertEndOfSlice();
-    assert(isMessageBounced(0x001)) throw 444;
+    assert(isMessageBounced(0x001) && !isMessageBounced(0x002)) throw 444;
     return (op1, q1, op2, q2);
 }
 
@@ -216,16 +216,16 @@ Note, that since 'compute-asm-ltr' became on be default, chaining methods codege
 """
   test6 PROC:<{
     //
-    NEWC	//  _1
-    1 PUSHINT	//  _1 _2=1
-    SWAP	//  _2=1 _1
-    32 STU	//  _0
-    2 PUSHINT	//  _0 _6=2
-    SWAP	//  _6=2 _0
-    32 STU	//  _0
-    3 PUSHINT	//  _0 _10=3
-    SWAP	//  _10=3 _0
-    32 STU	//  _0
+    NEWC	//  '0
+    1 PUSHINT	//  '0 '1=1
+    SWAP	//  '1=1 '0
+    32 STU	//  '0
+    2 PUSHINT	//  '0 '4=2
+    SWAP	//  '4=2 '0
+    32 STU	//  '0
+    3 PUSHINT	//  '0 '7=3
+    SWAP	//  '7=3 '0
+    32 STU	//  '0
   }>
 """
  */

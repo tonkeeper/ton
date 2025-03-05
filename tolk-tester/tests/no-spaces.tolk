@@ -22,7 +22,7 @@ global `some()var`:int;
     return `a`*-1*-(1)*---(1)*+just10()+-`just10`()*m1*-m1+-eq(m1)----0x1;
 }
 
-@method_id(112) fun `bitwise~ops`(flags:int):[int,int] {
+@method_id(112) fun `bitwise~ops`(flags:int):[bool,bool] {
     return[
         (just10()-3==just10()-(4)--1)|((2==2)&(eq(eq(10)) -3==just10()--13)),
         ((flags&0xFF)!=0)
@@ -104,10 +104,10 @@ fun`main`(){}
     DUP	//  fst1=-1 snd1=-1
     2 PUSHINT	//  fst1=-1 snd1=-1 trd1=2
     s1 s1 s0 PUSH3	//  fst1=-1 snd1=-1 trd1=2 fst2=-1 snd2=-1 trd2=2
-    add3 CALLDICT	//  fst1=-1 snd1=-1 trd1=2 _13
-    3 -ROLL	//  _13 fst1=-1 snd1=-1 trd1=2
-    add3 CALLDICT	//  _13 _14
-    PAIR	//  _12
+    add3 CALLDICT	//  fst1=-1 snd1=-1 trd1=2 '13
+    3 -ROLL	//  '13 fst1=-1 snd1=-1 trd1=2
+    add3 CALLDICT	//  '13 '14
+    PAIR	//  '12
   }>
 """
 

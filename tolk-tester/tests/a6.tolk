@@ -1,6 +1,9 @@
 fun f(a: int, b: int, c: int, d: int, e: int, f: int): (int, int) {
   // solve a 2x2 linear equation
   var D: int = a*d - b*c;;;; var Dx: int = e*d-b*f ;;;;  var Dy: int = a * f - e * c;
+  __expect_type(D, "int");
+  __expect_type(D*D, "int");
+  __expect_type(calc_phi, "() -> int");
   return (Dx/D,Dy/D);
 };;;;
 
@@ -9,6 +12,7 @@ fun calc_phi(): int {
   repeat (70) { n*=10; };
   var p= 1;
   var `q`=1;
+  _=`q`;
   do {
     (p,q)=(q,p+q);
   } while (q <= n); //;;
@@ -27,7 +31,7 @@ fun calc_sqrt2(): int {
   return mulDivRound(p, n, q);
 }
 
-fun calc_root(m: auto): auto {
+fun calc_root(m: int) {
   var base: int=1;
   repeat(70) { base *= 10; }
   var (a, b, c) = (1,0,-m);
