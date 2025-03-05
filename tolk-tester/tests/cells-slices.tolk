@@ -32,7 +32,8 @@ fun test1(): [int,int,int,int,int] {
 fun test2(): [int,int,int] {
     var b: builder = beginCell().myStoreInt(1, 32);
     b = b.myStoreInt(2, 32);
-    b.myStoreInt(3, 32);
+    // operator ! here and below is used just for testing purposes, it doesn't affect the result
+    b!.myStoreInt(3, 32);
 
     var cs: slice = b.endCell().beginParse();
     var one: int = cs.myLoadInt(32);
@@ -43,14 +44,14 @@ fun test2(): [int,int,int] {
 
 @method_id(103)
 fun test3(ret: int): int {
-    val same: int = beginCell().storeUint(ret,32).endCell().beginParse().loadUint(32);
+    val same: int = beginCell()!.storeUint(ret,32).endCell().beginParse().loadUint(32);
     return same;
 }
 
 @method_id(104)
 fun test4(): [int,int] {
-    var b: builder = beginCell().myStoreInt(1, 32);
-    b = b.storeInt(2, 32).storeInt(3, 32);
+    var b: builder = (beginCell() as builder).myStoreInt(1, 32);
+    b = b!.storeInt(2, 32)!.storeInt(3, 32);
 
     var cs: slice = b.endCell().beginParse();
     var (one, _, three) = (cs.getFirstBits(32).loadUint(32), cs.skipBits(64), cs.load_u32());
@@ -116,7 +117,7 @@ fun test10() {
 fun test11() {
     var s: slice = beginCell().storeInt(1, 32).storeInt(2, 32).storeInt(3, 32).storeInt(4, 32).storeInt(5, 32).storeInt(6, 32).storeInt(7, 32).endCell().beginParse();
     var size1 = getRemainingBitsCount(s);
-    s.skipBits(32);
+    s!.skipBits(32);
     var s1: slice = s.getFirstBits(64);
     var n1 = s1.loadInt(32);
     var size2 = getRemainingBitsCount(s);
@@ -162,8 +163,8 @@ fun test13() {
 }
 
 @method_id(114)
-fun test110(x: int) {
-    var s = beginCell().storeBool(x < 0).storeBool(0).storeBool(x).endCell().beginParse();
+fun test110(x: bool) {
+    var s = beginCell().storeBool(x == true).storeBool(false).storeBool(x).endCell().beginParse();
     return (s.loadBool(), s.loadBool(), s.loadBool());
 }
 
@@ -179,15 +180,15 @@ fun test111() {
     if (s.addressIsNone()) {
         s.skipBits(2);
     }
-    if (s.loadBool() == 0) {
-        assert(s.loadBool() == 0) throw 444;
+    if (s.loadBool() == false) {
+        assert(!s.loadBool()) throw 444;
         s.skipBouncedPrefix();
     }
     var op2 = s.loadMessageOp();
     var q2 = s.loadMessageQueryId();
     s.skipBits(64);
     s.assertEndOfSlice();
-    assert(isMessageBounced(0x001)) throw 444;
+    assert(isMessageBounced(0x001) && !isMessageBounced(0x002)) throw 444;
     return (op1, q1, op2, q2);
 }
 
@@ -216,16 +217,16 @@ Note, that since 'compute-asm-ltr' became on be default, chaining methods codege
 """
   test6 PROC:<{
     //
-    NEWC	//  _1
-    1 PUSHINT	//  _1 _2=1
-    SWAP	//  _2=1 _1
-    32 STU	//  _0
-    2 PUSHINT	//  _0 _6=2
-    SWAP	//  _6=2 _0
-    32 STU	//  _0
-    3 PUSHINT	//  _0 _10=3
-    SWAP	//  _10=3 _0
-    32 STU	//  _0
+    NEWC	//  '0
+    1 PUSHINT	//  '0 '1=1
+    SWAP	//  '1=1 '0
+    32 STU	//  '0
+    2 PUSHINT	//  '0 '4=2
+    SWAP	//  '4=2 '0
+    32 STU	//  '0
+    3 PUSHINT	//  '0 '7=3
+    SWAP	//  '7=3 '0
+    32 STU	//  '0
   }>
 """
  */

@@ -1050,15 +1050,17 @@ class Query {
     }
 
     vm::GasLimits gas_limits = compute_gas_limits(td::make_refint(raw_.source->get_balance()), gas_limits_prices);
-    auto res = smc.write().send_external_message(raw_.message_body, ton::SmartContract::Args()
-                                                                        .set_limits(gas_limits)
-                                                                        .set_balance(raw_.source->get_balance())
-                                                                        .set_now(raw_.source->get_sync_time())
-                                                                        .set_ignore_chksig(ignore_chksig)
-                                                                        .set_address(raw_.source->get_address())
-                                                                        .set_config(cfg)
-                                                                        .set_prev_blocks_info(state.prev_blocks_info)
-                                                                        .set_libraries(libraries));
+    auto res = smc.write().send_external_message(raw_.message_body,
+                                                 ton::SmartContract::Args()
+                                                     .set_limits(gas_limits)
+                                                     .set_balance(raw_.source->get_balance())
+                                                     .set_extra_currencies(raw_.source->get_extra_currencies())
+                                                     .set_now(raw_.source->get_sync_time())
+                                                     .set_ignore_chksig(ignore_chksig)
+                                                     .set_address(raw_.source->get_address())
+                                                     .set_config(cfg)
+                                                     .set_prev_blocks_info(state.prev_blocks_info)
+                                                     .set_libraries(libraries));
     td::int64 fwd_fee = 0;
     if (res.success) {
       LOG(DEBUG) << "output actions:\n"
@@ -4617,6 +4619,8 @@ void TonlibClient::get_libraries(ton::BlockIdExt blkid, std::vector<td::Bits256>
   std::vector<object_ptr<tonlib_api::smc_libraryEntry>> result_entries;
   result_entries.reserve(library_list.size());
   std::vector<td::Bits256> not_cached_hashes;
+  not_cached_hashes.reserve(library_list.size());
+
   for (auto& library_hash : library_list) {
     if (libraries.key_exists(library_hash)) {
       auto library_content = vm::std_boc_serialize(libraries.lookup_ref(library_hash)).move_as_ok().as_slice().str();
@@ -4631,7 +4635,8 @@ void TonlibClient::get_libraries(ton::BlockIdExt blkid, std::vector<td::Bits256>
     return;
   }
 
-  client_.send_query(ton::lite_api::liteServer_getLibrariesWithProof(ton::create_tl_lite_block_id(blkid), 1, std::move(not_cached_hashes)),
+  auto missed_lib_ids = not_cached_hashes;
+  client_.send_query(ton::lite_api::liteServer_getLibrariesWithProof(ton::create_tl_lite_block_id(blkid), 1, std::move(missed_lib_ids)),
                      promise.wrap([self=this, blkid, result_entries = std::move(result_entries), not_cached_hashes]
                                   (td::Result<ton::lite_api::object_ptr<ton::lite_api::liteServer_libraryResultWithProof>> r_libraries) mutable
                                     -> td::Result<tonlib_api::object_ptr<tonlib_api::smc_libraryResult>> {
@@ -4790,6 +4795,7 @@ td::Status TonlibClient::do_request(const tonlib_api::smc_runGetMethod& request,
   }
   args.set_stack(std::move(stack));
   args.set_balance(it->second->get_balance());
+  args.set_extra_currencies(it->second->get_extra_currencies());
   args.set_now(it->second->get_sync_time());
   args.set_address(it->second->get_address());
 

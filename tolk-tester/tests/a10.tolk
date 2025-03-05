@@ -2,7 +2,7 @@ import "@stdlib/tvm-lowlevel"
 
 fun pair_first<X, Y>(p: [X, Y]): X asm "FIRST";
 
-fun one(dummy: tuple) {
+fun one(dummy: tuple?) {
     return 1;
 }
 
@@ -35,7 +35,7 @@ fun test88(x: int) {
 }
 
 @method_id(89)
-fun test89(last: int) {
+fun test89(last: int): (int, int, int, int) {
     var t: tuple = createEmptyTuple();
     t.tuplePush(1);
     t.tuplePush(2);
@@ -78,6 +78,17 @@ fun testStartBalanceCodegen2() {
     return first;
 }
 
+global cur: [int, int, int];
+global next: [int, int, int];
+
+@method_id(95)
+fun test95() {
+    cur = [1, 2, 3];
+    next = [2, 3, 4];
+    (cur, next) = (next, [3, 4, 5]);
+    return (cur, next);
+}
+
 /**
     method_id | in     | out
 @testcase |  0 | 101 15 | 100 1
@@ -90,6 +101,7 @@ fun testStartBalanceCodegen2() {
 @testcase | 89 | 4      | 1 4 1 4
 @testcase | 91 |        | 10
 @testcase | 92 |        | 10 32
+@testcase | 95 |        | [ 2 3 4 ] [ 3 4 5 ]
 
 @fif_codegen
 """
@@ -104,9 +116,9 @@ fun testStartBalanceCodegen2() {
   testDumpDontPolluteStack PROC:<{
     ...
     DUMPSTK
-    x{6d79} PUSHSLICE	//  f s _9
+    x{6d79} PUSHSLICE	//  f s '5
     STRDUMP DROP
-    SBITS	//  f _11
+    SBITS	//  f '6
   }>
 """
 
@@ -125,6 +137,23 @@ fun testStartBalanceCodegen2() {
     //
     BALANCE
     FIRST	//  first
+  }>
+"""
+
+@fif_codegen
+"""
+  test95 PROC:<{
+    ...
+    next GETGLOB	//  g_next
+    3 PUSHINT	    //  g_next '14=3
+    4 PUSHINT	    //  g_next '14=3 '15=4
+    5 PUSHINT	    //  g_next '14=3 '15=4 '16=5
+    TRIPLE	        //  '10 '11
+    SWAP
+    cur SETGLOB
+    next SETGLOB
+    cur GETGLOB	    //  g_cur
+    next GETGLOB	//  g_cur g_next
   }>
 """
 */

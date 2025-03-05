@@ -163,8 +163,11 @@ td::Status ConfigInfo::unpack() {
   }
   gen::McStateExtra::Record extra_info;
   if (!tlb::unpack_cell(state_extra_root_, extra_info)) {
-    vm::load_cell_slice(state_extra_root_).print_rec(std::cerr);
-    block::gen::t_McStateExtra.print_ref(std::cerr, state_extra_root_);
+    FLOG(WARNING) {
+      sb << "state extra information is invalid: ";
+      vm::load_cell_slice(state_extra_root_).print_rec(sb);
+      block::gen::t_McStateExtra.print_ref(sb, state_extra_root_);
+    };
     return td::Status::Error("state extra information is invalid");
   }
   gen::ValidatorInfo::Record validator_info;
@@ -1067,7 +1070,6 @@ Ref<McShardHash> ShardConfig::get_shard_hash(ton::ShardIdFull id, bool exact) co
   ton::ShardIdFull true_id;
   vm::CellSlice cs;
   if (get_shard_hash_raw(cs, id, true_id, exact)) {
-    // block::gen::t_ShardDescr.print(std::cerr, vm::CellSlice{cs});
     return McShardHash::unpack(cs, true_id);
   } else {
     return {};
@@ -1637,8 +1639,10 @@ bool ShardConfig::set_shard_info(ton::ShardIdFull shard, Ref<vm::Cell> value) {
   if (!gen::t_BinTree_ShardDescr.validate_ref(1024, value)) {
     LOG(ERROR) << "attempting to store an invalid (BinTree ShardDescr) at shard configuration position "
                << shard.to_str();
-    gen::t_BinTree_ShardDescr.print_ref(std::cerr, value);
-    vm::load_cell_slice(value).print_rec(std::cerr);
+    FLOG(WARNING) {
+      gen::t_BinTree_ShardDescr.print_ref(sb, value);
+      vm::load_cell_slice(value).print_rec(sb);
+    };
     return false;
   }
   auto root = shard_hashes_dict_->lookup_ref(td::BitArray<32>{shard.workchain});
@@ -1956,6 +1960,7 @@ td::Result<SizeLimitsConfig> Config::do_get_size_limits_config(td::Ref<vm::CellS
     limits.max_acc_state_cells = rec.max_acc_state_cells;
     limits.max_acc_public_libraries = rec.max_acc_public_libraries;
     limits.defer_out_queue_size_limit = rec.defer_out_queue_size_limit;
+    limits.max_msg_extra_currencies = rec.max_msg_extra_currencies;
   };
   gen::SizeLimitsConfig::Record_size_limits_config rec_v1;
   gen::SizeLimitsConfig::Record_size_limits_config_v2 rec_v2;
@@ -2292,7 +2297,8 @@ Ref<vm::Cell> ConfigInfo::lookup_library(td::ConstBitPtr root_hash) const {
 td::Result<Ref<vm::Tuple>> ConfigInfo::get_prev_blocks_info() const {
   // [ wc:Integer shard:Integer seqno:Integer root_hash:Integer file_hash:Integer] = BlockId;
   // [ last_mc_blocks:[BlockId...]
-  //   prev_key_block:BlockId ] : PrevBlocksInfo
+  //   prev_key_block:BlockId
+  //   last_mc_blocks_100[BlockId...] ] : PrevBlocksInfo
   auto block_id_to_tuple = [](const ton::BlockIdExt& block_id) -> vm::Ref<vm::Tuple> {
     td::RefInt256 shard = td::make_refint(block_id.id.shard);
     if (shard->sgn() < 0) {
@@ -2302,25 +2308,44 @@ td::Result<Ref<vm::Tuple>> ConfigInfo::get_prev_blocks_info() const {
                               td::make_refint(block_id.id.seqno), td::bits_to_refint(block_id.root_hash.bits(), 256),
                               td::bits_to_refint(block_id.file_hash.bits(), 256));
   };
-  std::vector<vm::StackEntry> last_mc_blocks;
+  std::vector<vm::StackEntry> tuple;
 
+  std::vector<vm::StackEntry> last_mc_blocks;
   last_mc_blocks.push_back(block_id_to_tuple(block_id));
   for (ton::BlockSeqno seqno = block_id.id.seqno; seqno > 0 && last_mc_blocks.size() < 16;) {
     --seqno;
-    ton::BlockIdExt block_id;
-    if (!get_old_mc_block_id(seqno, block_id)) {
+    ton::BlockIdExt id;
+    if (!get_old_mc_block_id(seqno, id)) {
       return td::Status::Error("cannot fetch old mc block");
     }
-    last_mc_blocks.push_back(block_id_to_tuple(block_id));
+    last_mc_blocks.push_back(block_id_to_tuple(id));
   }
+  tuple.push_back(td::make_cnt_ref<std::vector<vm::StackEntry>>(std::move(last_mc_blocks)));
 
   ton::BlockIdExt last_key_block;
   ton::LogicalTime last_key_block_lt;
   if (!get_last_key_block(last_key_block, last_key_block_lt)) {
     return td::Status::Error("cannot fetch last key block");
   }
-  return vm::make_tuple_ref(td::make_cnt_ref<std::vector<vm::StackEntry>>(std::move(last_mc_blocks)),
-                            block_id_to_tuple(last_key_block));
+  tuple.push_back(block_id_to_tuple(last_key_block));
+
+  if (get_global_version() >= 9) {
+    std::vector<vm::StackEntry> last_mc_blocks_100;
+    for (ton::BlockSeqno seqno = block_id.id.seqno / 100 * 100; last_mc_blocks_100.size() < 16;) {
+      ton::BlockIdExt id;
+      if (!get_old_mc_block_id(seqno, id)) {
+        return td::Status::Error("cannot fetch old mc block");
+      }
+      last_mc_blocks_100.push_back(block_id_to_tuple(id));
+      if (seqno < 100) {
+        break;
+      }
+      seqno -= 100;
+    }
+    tuple.push_back(td::make_cnt_ref<std::vector<vm::StackEntry>>(std::move(last_mc_blocks_100)));
+  }
+
+  return td::make_cnt_ref<std::vector<vm::StackEntry>>(std::move(tuple));
 }
 
 td::optional<PrecompiledContractsConfig::Contract> PrecompiledContractsConfig::get_contract(

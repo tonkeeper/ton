@@ -1,14 +1,14 @@
 import "imports/use-dicts.tolk"
 
 fun simpleAllConst() {
-    return (!0, !!0 & !false, !!!0, !1, !!1, !-1, !!-1, (!5 == 0) == !0, !0 == true);
+    return (!0, !!0 & !false, !!!0, !1, !!1, !-1, !!-1, (!5 as int == 0) == !0, !0 == true);
 }
 
 fun compileTimeEval1(x: int) {
     // todo now compiler doesn't understand that bool can't be equal to number other than 0/-1
     // (but understands that it can't be positive)
     // that's why for now, the last condition is evaluated at runtime
-    return (!x, !x > 10, !x < 10, !!x == 5, !x == -10);
+    return (!x, !x as int > 10, (!x as int) < 10, !!x as int == 5, !x as int == -10);
 }
 
 @method_id(101)
@@ -23,13 +23,13 @@ fun withAndOr(x: int, y: int, z: int) {
     var return_at_end = -1;
     if (!x & !y) {
         if (!z & !y) { return 10; }
-        else if (z | !!y) { return_at_end = 20; }
+        else if ((z != 0) | !!y) { return_at_end = 20; }
     } else if (!!x & !!y & !z) {
         if (!z & (x > 10)) { return_at_end = 30; }
         if ((x != 11) & !z) { return 40; }
         return_at_end = 50;
     } else {
-        return_at_end = !x ? !y : !z | 1;
+        return_at_end = !x ? !y as int : (!z as int) | 1;
     }
     return return_at_end;
 }
@@ -53,8 +53,8 @@ fun testDict(last: int) {
 }
 
 @method_id(105)
-fun testNotNull(x: int) {
-    return [x == null, null == x, !(x == null), null == null, +(null != null)];
+fun testNotNull(x: int?) {
+    return [x == null, null == x, !(x == null), null == null, (null != null) as int];
 }
 
 @method_id(106)
@@ -123,6 +123,31 @@ fun testLogicalOps2(first: int) {
     return (s.getRemainingBitsCount(), sum);
 }
 
+@method_id(112)
+fun mixLogicalIntsAndBools(first: int, cond: bool) {
+    return (
+        (first && cond) || (!first && cond),
+        ((first & -1) & cond as int) == ((first && true) && cond) as int,
+        7 && cond,
+        first || cond || !cond || alwaysThrows(),
+        cond || first || !first || alwaysThrows()
+    );
+}
+
+@method_id(113)
+fun testConvertIfToIfnot(x: bool) {
+    assert(!!(x == false), 100);
+    assert(!x, 100);
+    if (x == !!false) {
+        return 1;
+    }
+    if (!!(x != !false)) {
+        return 1;
+    }
+    assert(!!x, 100);
+    return -4;
+}
+
 fun main() {
 
 }
@@ -159,18 +184,21 @@ fun main() {
 @testcase | 110 | 500    | -1 -1 0 -1 -1 3
 @testcase | 111 | 0      | 32 4
 @testcase | 111 | -1     | 0 8
+@testcase | 112 | 5 0    | 0 -1 0 -1 -1
+@testcase | 112 | 0 -1   | -1 -1 -1 -1 -1
+@testcase | 113 | 0      | 1
 
 @fif_codegen
 """
   simpleAllConst PROC:<{
     //
-    -1 PUSHINT
+    TRUE
     0 PUSHINT
-    -1 PUSHINT
-    0 PUSHINT
-    -1 PUSHINT
-    0 PUSHINT
-    -1 PUSHINT
+    TRUE
+    FALSE
+    TRUE
+    FALSE
+    TRUE
     TRUE
     TRUE
   }>
@@ -181,15 +209,15 @@ fun main() {
   compileTimeEval1 PROC:<{
     //  x
     DUP	//  x x
-    0 EQINT	//  x _1
-    FALSE	//  x _1 _4
-    TRUE	//  x _1 _4 _7
-    FALSE	//  x _1 _4 _7 _11
-    s0 s4 XCHG	//  _11 _1 _4 _7 x
-    0 EQINT	//  _11 _1 _4 _7 _12
-    -10 EQINT	//  _11 _1 _4 _7 _14
+    0 EQINT	//  x '1
+    FALSE	//  x '1 '4
+    TRUE	//  x '1 '4 '7
+    FALSE	//  x '1 '4 '7 '11
+    s0 s4 XCHG	//  '11 '1 '4 '7 x
+    0 EQINT	//  '11 '1 '4 '7 '12
+    -10 EQINT	//  '11 '1 '4 '7 '14
     s3 s4 XCHG
-    s1 s3 s0 XCHG3	//  _1 _4 _7 _11 _14
+    s1 s3 s0 XCHG3	//  '1 '4 '7 '11 '14
   }>
 """
 
@@ -201,15 +229,15 @@ fun main() {
     OVER	//  x y x
     IFNOTJMP:<{	//  x y
       2DROP	//
-      10 PUSHINT	//  _2=10
+      10 PUSHINT	//  '2=10
     }>	//  x y
     DUP	//  x y y
     IFNOTJMP:<{	//  x y
       2DROP	//
-      20 PUSHINT	//  _3=20
+      20 PUSHINT	//  '3=20
       RETALT
     }>	//  x y
-    ADD	//  _4
+    ADD	//  '4
   }>
 """
 
@@ -268,10 +296,10 @@ These are moments of future optimizations. For now, it's more than enough.
     //  a b
     SWAP	//  b a
     IF:<{	//  b
-      0 NEQINT	//  _2
+      0 NEQINT	//  '2
     }>ELSE<{	//  b
       DROP	//
-      0 PUSHINT	//  _2=0
+      0 PUSHINT	//  '2=0
     }>
   }>
 """
@@ -281,14 +309,37 @@ These are moments of future optimizations. For now, it's more than enough.
   testOrSimpleCodegen PROC:<{
     //  a b
     SWAP	//  b a
-    0 GTINT	//  b _3
+    0 GTINT	//  b '3
     IF:<{	//  b
       DROP	//
-      -1 PUSHINT	//  _4=-1
+      -1 PUSHINT	//  '4=-1
     }>ELSE<{	//  b
-      0 GTINT	//  _7
-      0 NEQINT	//  _4
+      0 GTINT	//  '7
+      0 NEQINT	//  '4
     }>
+  }>
+"""
+
+@fif_codegen
+"""
+  testConvertIfToIfnot PROC:<{
+    //  x
+    DUP	//  x x
+    100 THROWIF
+    DUP	//  x x
+    100 THROWIF
+    DUP	//  x x
+    IFNOTJMP:<{	//  x
+      DROP	//
+      1 PUSHINT	//  '5=1
+    }>	//  x
+    DUP	//  x x
+    IFNOTJMP:<{	//  x
+      DROP	//
+      1 PUSHINT	//  '6=1
+    }>	//  x
+    100 THROWIFNOT
+    -4 PUSHINT	//  '9=-4
   }>
 """
 

@@ -264,7 +264,7 @@ bool CellSlice::advance_ext(unsigned bits, unsigned refs) {
 }
 
 bool CellSlice::advance_ext(unsigned bits_refs) {
-  return advance_ext(bits_refs >> 16, bits_refs & 0xffff);
+  return advance_ext(bits_refs & 0xffff, bits_refs >> 16);
 }
 
 // (PRIVATE)
@@ -1024,6 +1024,13 @@ bool CellSlice::print_rec(std::ostream& os, int* limit, int indent) const {
 bool CellSlice::print_rec(std::ostream& os, int indent) const {
   int limit = default_recursive_print_limit;
   return print_rec(os, &limit, indent);
+}
+
+bool CellSlice::print_rec(td::StringBuilder& sb, int indent) const {
+  std::ostringstream ss;
+  auto result = print_rec(ss, indent);
+  sb << ss.str();
+  return result;
 }
 
 bool CellSlice::print_rec(int limit, std::ostream& os, int indent) const {

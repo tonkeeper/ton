@@ -52,10 +52,10 @@ std::ostream& operator<<(std::ostream& os, AsmOp::SReg stack_reg) {
   }
 }
 
-AsmOp AsmOp::Const(int arg, std::string push_op, td::RefInt256 origin) {
+AsmOp AsmOp::Const(int arg, const std::string& push_op) {
   std::ostringstream os;
   os << arg << ' ' << push_op;
-  return AsmOp::Const(os.str(), origin);
+  return AsmOp::Const(os.str());
 }
 
 AsmOp AsmOp::make_stk2(int a, int b, const char* str, int delta) {
@@ -161,36 +161,36 @@ AsmOp AsmOp::UnTuple(int a) {
   return AsmOp::Custom(os.str(), 1, a);
 }
 
-AsmOp AsmOp::IntConst(td::RefInt256 x) {
+AsmOp AsmOp::IntConst(const td::RefInt256& x) {
   if (x->signed_fits_bits(8)) {
-    return AsmOp::Const(dec_string(x) + " PUSHINT", x);
+    return AsmOp::Const(dec_string(x) + " PUSHINT");
   }
   if (!x->is_valid()) {
-    return AsmOp::Const("PUSHNAN", x);
+    return AsmOp::Const("PUSHNAN");
   }
   int k = is_pos_pow2(x);
   if (k >= 0) {
-    return AsmOp::Const(k, "PUSHPOW2", x);
+    return AsmOp::Const(k, "PUSHPOW2");
   }
   k = is_pos_pow2(x + 1);
   if (k >= 0) {
-    return AsmOp::Const(k, "PUSHPOW2DEC", x);
+    return AsmOp::Const(k, "PUSHPOW2DEC");
   }
   k = is_pos_pow2(-x);
   if (k >= 0) {
-    return AsmOp::Const(k, "PUSHNEGPOW2", x);
+    return AsmOp::Const(k, "PUSHNEGPOW2");
   }
   if (!x->mod_pow2_short(23)) {
-    return AsmOp::Const(dec_string(x) + " PUSHINTX", x);
+    return AsmOp::Const(dec_string(x) + " PUSHINTX");
   }
-  return AsmOp::Const(dec_string(x) + " PUSHINT", x);
+  return AsmOp::Const(dec_string(x) + " PUSHINT");
 }
 
 AsmOp AsmOp::BoolConst(bool f) {
   return AsmOp::Const(f ? "TRUE" : "FALSE");
 }
 
-AsmOp AsmOp::Parse(std::string custom_op) {
+AsmOp AsmOp::Parse(const std::string& custom_op) {
   if (custom_op == "NOP") {
     return AsmOp::Nop();
   } else if (custom_op == "SWAP") {
@@ -302,24 +302,13 @@ Const AsmOpList::get_const(const_idx_t idx) {
   }
 }
 
-void AsmOpList::show_var(std::ostream& os, var_idx_t idx) const {
-  if (!var_names_ || (unsigned)idx >= var_names_->size()) {
-    os << '_' << idx;
-  } else {
-    var_names_->at(idx).show(os, 2);
-  }
-}
-
 void AsmOpList::show_var_ext(std::ostream& os, std::pair<var_idx_t, const_idx_t> idx_pair) const {
-  auto i = idx_pair.first;
-  auto j = idx_pair.second;
+  var_idx_t i = idx_pair.first;
+  const_idx_t j = idx_pair.second;
   if (!var_names_ || (unsigned)i >= var_names_->size()) {
-    os << '_' << i;
+    os << '\'' << i;
   } else {
-    var_names_->at(i).show(os, 2);
-    // if (!var_names_->at(i).v_type->is_int()) {
-    //   os << '<'; var_names_->at(i).v_type->print(os); os << '>';
-    // }
+    var_names_->at(i).show_as_stack_comment(os);
   }
   if ((unsigned)j < constants_.size() && constants_[j].not_null()) {
     os << '=' << constants_[j];

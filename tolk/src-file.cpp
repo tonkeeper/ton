@@ -18,13 +18,14 @@
 #include "compiler-state.h"
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 
 namespace tolk {
 
 static_assert(sizeof(SrcLocation) == 8);
 
-SrcFile* AllRegisteredSrcFiles::find_file(int file_id) const {
-  for (SrcFile* file : all_src_files) {
+const SrcFile* AllRegisteredSrcFiles::find_file(int file_id) const {
+  for (const SrcFile* file : all_src_files) {
     if (file->file_id == file_id) {
       return file;
     }
@@ -32,8 +33,8 @@ SrcFile* AllRegisteredSrcFiles::find_file(int file_id) const {
   return nullptr;
 }
 
-SrcFile* AllRegisteredSrcFiles::find_file(const std::string& abs_filename) const {
-  for (SrcFile* file : all_src_files) {
+const SrcFile* AllRegisteredSrcFiles::find_file(const std::string& abs_filename) const {
+  for (const SrcFile* file : all_src_files) {
     if (file->abs_filename == abs_filename) {
       return file;
     }
@@ -41,7 +42,7 @@ SrcFile* AllRegisteredSrcFiles::find_file(const std::string& abs_filename) const
   return nullptr;
 }
 
-SrcFile* AllRegisteredSrcFiles::locate_and_register_source_file(const std::string& rel_filename, SrcLocation included_from) {
+const SrcFile* AllRegisteredSrcFiles::locate_and_register_source_file(const std::string& rel_filename, SrcLocation included_from) {
   td::Result<std::string> path = G.settings.read_callback(CompilerSettings::FsReadCallbackKind::Realpath, rel_filename.c_str());
   if (path.is_error()) {
     if (included_from.is_defined()) {
@@ -51,7 +52,7 @@ SrcFile* AllRegisteredSrcFiles::locate_and_register_source_file(const std::strin
   }
 
   std::string abs_filename = path.move_as_ok();
-  if (SrcFile* file = find_file(abs_filename)) {
+  if (const SrcFile* file = find_file(abs_filename)) {
     return file;
   }
 
@@ -75,16 +76,7 @@ SrcFile* AllRegisteredSrcFiles::get_next_unparsed_file() {
   if (last_parsed_file_id >= last_registered_file_id) {
     return nullptr;
   }
-  return all_src_files[++last_parsed_file_id];
-}
-
-AllSrcFiles AllRegisteredSrcFiles::get_all_files() const {
-  AllSrcFiles src_files_immutable;
-  src_files_immutable.reserve(all_src_files.size());
-  for (const SrcFile* file : all_src_files) {
-    src_files_immutable.push_back(file);
-  }
-  return src_files_immutable;
+  return const_cast<SrcFile*>(all_src_files[++last_parsed_file_id]);
 }
 
 bool SrcFile::is_stdlib_file() const {
@@ -155,9 +147,10 @@ void SrcLocation::show_context(std::ostream& os) const {
     return;
   }
   SrcFile::SrcPosition pos = src_file->convert_offset(char_offset);
-  os << "  "  << pos.line_str << "\n";
+  os << std::right << std::setw(4) << pos.line_no << " | ";
+  os << pos.line_str << "\n";
 
-  os << "  ";
+  os << "    " << " | ";
   for (int i = 1; i < pos.char_no; ++i) {
     os << ' ';
   }
@@ -202,8 +195,11 @@ std::ostream& operator<<(std::ostream& os, const ParseError& error) {
 }
 
 void ParseError::show(std::ostream& os) const {
-  os << where << ": error: " << message << std::endl;
-  where.show_context(os);
+  os << loc << ": error: " << message << std::endl;
+  if (current_function) {
+    os << "    // in function `" << current_function->as_human_readable() << "`" << std::endl;
+  }
+  loc.show_context(os);
 }
 
 }  // namespace tolk
